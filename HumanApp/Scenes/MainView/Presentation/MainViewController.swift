@@ -1,0 +1,179 @@
+//
+//  MainViewController.swift
+//  HumanApp
+//
+//  Created by Никита Коголенок on 15.01.25.
+//
+
+import UIKit
+import Photos
+
+final class MainViewController: UIViewController {
+    
+    // MARK: - Variables
+    
+    // MARK: - GUI Variables
+    private lazy var plusButton: UIButton = {
+        let button = UIButton()
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("+", for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 30)
+        button.addTarget(self, action: #selector(plusButtonTaped), for: .touchUpInside)
+        return button
+    }()
+    
+    lazy var segmentedControl: UISegmentedControl = {
+        let items = ["Original", "Black & White"]
+        let segmentedControl = UISegmentedControl(items: items)
+        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        segmentedControl.selectedSegmentIndex = 0
+        segmentedControl.isHidden = true
+        //segmentedControl.addTarget(self, action: #selector(segmentedControlValueChanged), for: .valueChanged)
+        return segmentedControl
+    }()
+    
+    var imageView: UIImageView?
+
+    // MARK: - View LifeCycle
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        setupUI()
+    }
+    
+    private func setupUI() {
+        view.backgroundColor = .systemBackground
+        
+        let saveBarButtonItem = UIBarButtonItem(barButtonSystemItem: .save, target: self, action: #selector(saveBarButtonTaped))
+        navigationItem.rightBarButtonItem = saveBarButtonItem
+        
+        view.addSubview(plusButton)
+        
+        NSLayoutConstraint.activate([
+            plusButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            plusButton.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+        
+        view.addSubview(segmentedControl)
+        
+        NSLayoutConstraint.activate([
+            segmentedControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            segmentedControl.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+    }
+    
+    // MARK: - Actions
+    @objc private func plusButtonTaped() {
+        let imagePicker = UIImagePickerController()
+        imagePicker.delegate = self
+        imagePicker.sourceType = .photoLibrary
+        present(imagePicker, animated: true, completion: nil)
+    }
+    
+    @objc private func saveBarButtonTaped() {
+        guard let image = imageView?.image else {
+            print("No image to save")
+            return
+        }
+        
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+        
+    }
+    
+    @objc func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeMutableRawPointer) {
+        if let error = error {
+            print("Error saving image: \(error.localizedDescription)")
+        } else {
+            print("Image saved successfully")
+            DispatchQueue.main.async {
+                self.dismiss(animated: true)
+            }
+        }
+    }
+    
+    @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard let viewToMove = gesture.view else { return }
+        
+        let translation = gesture.translation(in: self.view)
+        viewToMove.center = CGPoint(x: viewToMove.center.x + translation.x, y: viewToMove.center.y + translation.y)
+        gesture.setTranslation(.zero, in: self.view)
+    }
+    
+    @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard let viewToTransform = gesture.view else { return }
+        
+        if gesture.state == .began || gesture.state == .changed {
+            viewToTransform.transform = viewToTransform.transform.scaledBy(x: gesture.scale, y: gesture.scale)
+            gesture.scale = 1
+        }
+    }
+
+    @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
+        guard let viewToTransform = gesture.view else { return }
+        
+        if gesture.state == .began || gesture.state == .changed {
+            viewToTransform.transform = viewToTransform.transform.rotated(by: gesture.rotation)
+            gesture.rotation = 0
+        }
+    }
+    
+}
+
+extension MainViewController: UIImagePickerControllerDelegate & UINavigationControllerDelegate {
+
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        picker.dismiss(animated: true, completion: nil)
+        
+        if let selectedImage = info[.originalImage] as? UIImage {
+            displayImage(selectedImage)
+        }
+    }
+    
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        picker.dismiss(animated: true, completion: nil)
+    }
+    
+    func displayImage(_ image: UIImage) {
+        imageView?.removeFromSuperview()
+        
+        let borderView = UIView()
+        borderView.layer.borderWidth = 2
+        borderView.layer.borderColor = UIColor.yellow.cgColor
+        borderView.translatesAutoresizingMaskIntoConstraints = false
+        
+        imageView = UIImageView(image: image)
+        imageView?.contentMode = .scaleAspectFit
+        imageView?.isUserInteractionEnabled = true
+        
+        if let imageView = imageView {
+            borderView.addSubview(imageView)
+            view.addSubview(borderView)
+            
+            NSLayoutConstraint.activate([
+                borderView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+                borderView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                borderView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                borderView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            ])
+            
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            
+            NSLayoutConstraint.activate([
+                imageView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: 10),
+                imageView.leadingAnchor.constraint(equalTo: borderView.leadingAnchor),
+                imageView.trailingAnchor.constraint(equalTo: borderView.trailingAnchor),
+                imageView.bottomAnchor.constraint(equalTo: borderView.safeAreaLayoutGuide.bottomAnchor, constant: -10)
+            ])
+            
+            
+            let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+            borderView.addGestureRecognizer(panGesture)
+            
+            let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+            borderView.addGestureRecognizer(pinchGesture)
+    
+            let rotationGesture = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
+            borderView.addGestureRecognizer(rotationGesture)
+        }
+    }
+}
