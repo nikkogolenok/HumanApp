@@ -17,7 +17,8 @@ final class MainViewController: UIViewController {
         let button = UIButton()
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setTitle("+", for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 30)
+        button.setTitleColor(.systemBlue, for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 50)
         button.addTarget(self, action: #selector(plusButtonTaped), for: .touchUpInside)
         return button
     }()
@@ -27,8 +28,7 @@ final class MainViewController: UIViewController {
         let segmentedControl = UISegmentedControl(items: items)
         segmentedControl.translatesAutoresizingMaskIntoConstraints = false
         segmentedControl.selectedSegmentIndex = 0
-        segmentedControl.isHidden = true
-        //segmentedControl.addTarget(self, action: #selector(segmentedControlValueChanged), for: .valueChanged)
+        segmentedControl.addTarget(self, action: #selector(segmentedControlValueChanged), for: .valueChanged)
         return segmentedControl
     }()
     
@@ -58,8 +58,31 @@ final class MainViewController: UIViewController {
         
         NSLayoutConstraint.activate([
             segmentedControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            segmentedControl.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            segmentedControl.centerXAnchor.constraint(equalTo: view.centerXAnchor)
         ])
+    }
+    
+    func applyBlackAndWhiteFilter(to image: UIImage) -> UIImage? {
+        guard let ciImage = CIImage(image: image) else { return nil }
+        
+        let filter = CIFilter(name: "CIColorControls")
+        filter?.setValue(ciImage, forKey: kCIInputImageKey)
+        filter?.setValue(0.0, forKey: kCIInputSaturationKey)
+        
+        guard let outputImage = filter?.outputImage else { return nil }
+        
+        let context = CIContext()
+        if let cgImage = context.createCGImage(outputImage, from: outputImage.extent) {
+            return UIImage(cgImage: cgImage)
+        }
+        return nil
+    }
+    
+    func showErrorSave() {
+        let alertController = UIAlertController(title: "You shold tapped button '+'", message: "Your picture save", preferredStyle: .alert)
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+        alertController.addAction(cancelAction)
+        present(alertController, animated: true)
     }
     
     // MARK: - Actions
@@ -70,14 +93,28 @@ final class MainViewController: UIViewController {
         present(imagePicker, animated: true, completion: nil)
     }
     
+    @objc private func segmentedControlValueChanged(_ sender: UISegmentedControl) {
+        switch sender.selectedSegmentIndex {
+        case 0:
+            if let originalImage = imageView?.image {
+                imageView?.image = originalImage
+            }
+        case 1:
+            if let originalImage = imageView?.image {
+                imageView?.image = applyBlackAndWhiteFilter(to: originalImage)
+            }
+        default:
+            break
+        }
+    }
+
     @objc private func saveBarButtonTaped() {
         guard let image = imageView?.image else {
-            print("No image to save")
+            showErrorSave()
             return
         }
         
         UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
-        
     }
     
     @objc func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeMutableRawPointer) {
@@ -85,9 +122,10 @@ final class MainViewController: UIViewController {
             print("Error saving image: \(error.localizedDescription)")
         } else {
             print("Image saved successfully")
-            DispatchQueue.main.async {
-                self.dismiss(animated: true)
-            }
+//            imageView?.image = nil
+//            DispatchQueue.main.async {
+//                self.dismiss(animated: true)
+//            }
         }
     }
     
@@ -150,19 +188,19 @@ extension MainViewController: UIImagePickerControllerDelegate & UINavigationCont
             view.addSubview(borderView)
             
             NSLayoutConstraint.activate([
-                borderView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+                borderView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 10),
                 borderView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
                 borderView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-                borderView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+                borderView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -10),
             ])
             
             imageView.translatesAutoresizingMaskIntoConstraints = false
             
             NSLayoutConstraint.activate([
-                imageView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: 10),
+                imageView.topAnchor.constraint(equalTo: borderView.topAnchor),
                 imageView.leadingAnchor.constraint(equalTo: borderView.leadingAnchor),
                 imageView.trailingAnchor.constraint(equalTo: borderView.trailingAnchor),
-                imageView.bottomAnchor.constraint(equalTo: borderView.safeAreaLayoutGuide.bottomAnchor, constant: -10)
+                imageView.bottomAnchor.constraint(equalTo: borderView.bottomAnchor)
             ])
             
             
